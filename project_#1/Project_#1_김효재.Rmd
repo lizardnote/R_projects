@@ -1,0 +1,204 @@
+---
+title: "R-assignment1 김효재"
+output: html_document
+---
+
+
+
+
+
+#1. 숭실대입구(살피재)역의 11월 1일 시간대별 승차 및 하차 인원수를 하나의 그래프로 시각화해보자.
+
+```{r message=FALSE}
+
+#먼저 사용할 패키지를 불러온다.
+library(ggplot2)
+library(tidyr)
+library(dplyr)
+
+#subway변수에 metro.csv 파일을 불러오고, 데이터 구조를 확인한다.
+subway <- read.csv("C:/Users/chk/Documents/metro.csv")
+str(subway)
+
+#숭실대입구역의 11월 1일 데이터만 필터링하기 위해 dplyr패키지의 filter 함수를 이용한다.
+real_data <- subway %>% filter(역명=="숭실대입구(살피재)" & 날짜 == "2019-11-01")
+str(real_data)
+
+#여러개 컬럼으로 된 시간 변수를 하나의 컬럼으로 tidyr패키지의 gather()함수를 이용해 변환한다. 
+real_data %>% gather(key ='시간', value ='승하차인원',X04...05:X03...04) %>% head(20)
+real_data <- real_data %>% gather(key ='시간', value ='승하차인원',X04...05:X03...04)
+
+#subway$시간을 factor로 변환 해주고, 텍스트 형식의 날짜 데이터도 Date 형식으로 변환해준다.
+real_data$날짜 <- as.Date(as.character(real_data$날짜))
+real_data$시간 <- factor(real_data$시간, ordered = TRUE)
+str(real_data)
+```
+
+<br/>
+
+``` {r graph 1}
+
+#geom_point,line 등에 옵션을 넣어보면서 그래프 디자인을 변경할 수 있다.
+
+ggplot(real_data, aes(x = 시간, y =승하차인원, group = 구분, color = 구분)) + geom_line()  + geom_point(size = 2)+ labs(x="시간대", y="승하차인원수(명)", title="숭실대입구(살피재)역 시간대별 승하차 인원 수", subtitle="2019-11-01") + scale_x_discrete(labels=paste0(c(0:23),"시"))+ theme_minimal() +  theme(plot.title = element_text( face = "bold", hjust = 0.5, size = 15, color = "purple")) + theme(axis.text.x = element_text(hjust=0.5))
+
+ggplot(real_data, aes(x = 시간, y =승하차인원, group = 구분, color = 구분)) + geom_line(color="black")  + geom_point(size = 2) + labs(x="시간대", y="승하차인원수(명)", title="숭실대입구(살피재)역 시간대별 승하차 인원 수", subtitle="2019-11-01") + scale_x_discrete(labels=paste0(c(0:23),"시"))+ theme_minimal() +  theme(plot.title = element_text( face = "bold", hjust = 0.5, size = 15, color = "purple")) + theme(axis.text.x = element_text(hjust=0.5))
+
+ggplot(real_data, aes(x = 시간, y =승하차인원, group = 구분, color = 구분)) + geom_line()  + geom_point(size = 2, color="black") + labs(x="시간대", y="승하차인원수(명)", title="숭실대입구(살피재)역 시간대별 승하차 인원 수", subtitle="2019-11-01") + scale_x_discrete(labels=paste0(c(0:23),"시"))+ theme_minimal() +  theme(plot.title = element_text( face = "bold", hjust = 0.5, size = 15, color = "purple")) + theme(axis.text.x = element_text(hjust=0.5))
+
+
+#stacked bar chart 승차인원과 하차인원을 하나의 bar로 쌓은 그래프로 변화정도, bar에 기여하는 정도를 볼 수 있다.
+
+ggplot(real_data, aes(x = 시간, y = 승하차인원, fill = 구분)) + geom_bar(stat = "identity") + labs(x="시간대", y="승하차인원수(명)", title="숭실대입구(살피재)역 시간대별 승하차 인원 수", subtitle="2019-11-01") + scale_x_discrete(labels=paste0(c(0:23),"시"))+ scale_fill_brewer(palette = "Set3") + theme_minimal() +  theme(plot.title = element_text(face = "bold", hjust =0.5, size = 15, color = "darkblue"))
+
+#grouped bar chart 승차인원과 하차인원별로 bar를 x축으로 나란히 위치시킨 그래프이다.
+
+ggplot(real_data, aes(x = 시간, y = 승하차인원, fill = 구분)) + geom_bar(stat ="identity", position = position_dodge(preserve = "single")) + labs(x="시간대", y="승하차인원수(명)", title="숭실대입구(살피재)역 시간대별 승하차 인원 수", subtitle="2019-11-01") + scale_x_discrete(labels=paste0(c(0:23),"시"))+ scale_fill_brewer(palette = "Set3") + theme_minimal() +  theme(plot.title = element_text(face = "bold", hjust = 0.5, size = 15, color = "darkblue"))
+
+```
+
+<br/>
+
+#==============================================================================================================================
+
+<br/>
+
+#2. 숭실대입구(살피재)역의 11월 4일부터 11월 10일까지 일주일간 각 요일별 시간대별 승차인원과 하차인원의 분포를 각각 히트맵으로 시각화해보자. 
+
+<br/>
+
+```{R message = FALSE}
+
+#앞에서 불러온 subway데이터를 이용해 real_data2 변수에 새로 저장한다.
+real_data2 <- subway %>% filter(역명=="숭실대입구(살피재)")
+real_data2 <- real_data2 %>% filter(날짜 == "2019-11-04" | 날짜 == "2019-11-05" | 날짜 == "2019-11-06" |날짜 == "2019-11-07" | 날짜 == "2019-11-08" | 날짜 == "2019-11-09" | 날짜 == "2019-11-10")
+
+#여러개 컬럼으로 된 시간 변수를 하나의 컬럼으로 tidyr패키지의 gather()함수를 이용해 변환한다.
+real_data2 <- real_data2 %>% gather(key ='시간', value ='승하차인원',X04...05:X03...04)
+str(real_data2)
+
+#subway$시간을 factor로 변환 해주고, 텍스트 형식의 날짜 데이터도 Date 형식으로 변환해준다.
+real_data2$날짜 <- as.Date(as.character(real_data2$날짜))
+real_data2$시간 <- factor(real_data2$시간, ordered = TRUE)
+str(real_data2)
+
+#승차 하차 데이터를 따로 저장해준다.
+on_data <- subset(real_data2, 구분 == "승차")
+off_data <- subset(real_data2, 구분 == "하차")
+```
+
+<br/>
+
+```{r graph 2}
+
+#승차인원 데이터를 이용한 heatmap
+ggplot(on_data, aes(x=시간, y=날짜, fill=승하차인원)) + geom_tile() + theme_minimal() + scale_x_discrete(labels=paste0(c(0:23),"시")) + scale_y_date(date_breaks = "1 day", date_labels = "%m.%d %a") + labs(title="숭실대입구(살피재) 역의 일주일간 각 요일별, 시간대별 승차 인원 수", subtitle="2019-11-04 ~ 2019-11-10", x="시간", y="날짜", fill="승차인원") + theme(axis.text.x = element_text(hjust=1))  + scale_fill_continuous(low = "white", high = "red")
+
+#하차인원 데이터를 이용한 heatmap
+ggplot(off_data, aes(x=시간, y=날짜, fill=승하차인원)) + geom_tile() + theme_minimal() + scale_x_discrete(labels=paste0(c(0:23),"시")) + scale_y_date(date_breaks = "1 day", date_labels = "%m.%d %a") + labs(title="숭실대입구(살피재) 역의 일주일간 각 요일별, 시간대별 하차 인원 수", subtitle="2019-11-04 ~ 2019-11-10", x="시간", y="날짜", fill="하차인원") + theme(axis.text.x = element_text(hjust=1))  + scale_fill_continuous(low = "white", high = "red")
+
+#승차, 하차인원 데이터를 facet_wrap()을 이용해 동시에 시각화하여 heatmap 나타내기
+ggplot(real_data2, aes(x=시간, y=날짜, fill=승하차인원)) + geom_tile() + theme_minimal() +  facet_wrap(~구분, ncol=1) + scale_x_discrete(labels=paste0(c(0:23),"시")) + scale_y_date(date_breaks = "1 day", date_labels = "%m.%d %a") + labs(title="숭실대입구(살피재) 역의 일주일간 각 요일별, 시간대별 승하차 인원 수", subtitle="2019-11-04 ~ 2019-11-10", x="시간", y="날짜", fill="인원수") + theme(axis.text.x = element_text(angle = 30, hjust=1))  + scale_fill_continuous(low = "white", high = "red")
+```
+
+<br/>
+
+#======================================================================================================================
+
+<br/>
+
+#3. 7호선의 모든 역 중에서 유동인구(월간 승하차 전체인원)가 가장 많은 20개 역에 대한 유동인구 수를 그래프로 시각화해보자.
+
+<br/>
+
+```{R message = FALSE}
+
+#앞에서 불러온 subway데이터를 이용해 real_data3 변수에 새로 저장한다.
+real_data3 <- subway %>% gather(key ='시간', value ='승하차인원',X04...05:X03...04)
+real_data3 %>% head(10)
+real_data3 <- real_data3 %>% filter(호선=="7호선")
+
+#위와 동일하게 subway$시간을 factor로 변환 해주고, 텍스트 형식의 날짜 데이터도 Date 형식으로 변환해준다.
+real_data3$날짜 <- as.Date(as.character(real_data3$날짜))
+real_data3$시간 <- factor(real_data3$시간, ordered = TRUE)
+
+#필요없는 coloumn을 제외하고 필요한 coloumn만 가져와 저장한다.
+real_data3 <- real_data3[,c(5,8)]
+str(real_data3)
+
+#역명을 기준으로 승하차인원을 sum() 을 이용해 합하여 total 변수에 저장한다.
+real_data3 <- real_data3 %>% group_by(역명) %>% summarise(total = sum(승하차인원))
+real_data3 %>% head(10)
+
+#total(승하차인원수의 합)변수를 내림차순으로 정렬하여 상위 20개만 top20_real_data3 변수에 저장한다.
+top20_real_data3<- real_data3 %>% arrange(desc(total)) %>% head(20)
+top20_real_data3
+```
+
+<br/>
+
+```{r graph 3}
+
+#bar graph를 이용해 시각화한다. x축 label이 겹치는 것을 방지하기 위해 각도를 조정해준다.
+ggplot(top20_real_data3, aes(x=역명, y=total)) + geom_bar(stat = "identity", fill = "indianred3", color = "black") + scale_y_continuous(limits=c(0, 2600000), breaks=seq(0, 2600000, 500000)) + geom_text(aes(label = total), vjust = -0.5, size = 2.2) + labs(x="역명", y="유동인구 수", title="7호선 월간 승하차 유동인구 수", subtitle="2019-11월") + theme(axis.text.x = element_text(angle = 45, hjust=1))
+
+#위 그래프를 정렬하여 나타낼 수도 있다.
+ggplot(top20_real_data3, aes(x=reorder(역명,-total), y=total)) + geom_bar(stat = "identity", fill = "indianred3", color = "black") + scale_y_continuous(limits=c(0, 2600000), breaks=seq(0, 2600000, 500000)) + geom_text(aes(label = total), vjust = -0.5, size = 2.7) + labs(x="역명", y="유동인구 수", title="7호선 월간 승하차 유동인구 수", subtitle="2019-11월") + theme(axis.text.x = element_text(angle = 45, hjust=1))
+```
+
+<br/>
+
+#=========================================================================================================================
+
+<br/>
+
+#4. 7호선 지하철역의 위치 정보(metro_coord.csv)를 활용하여 7호선 모든 역에 대한 유동인구 분포를 지도 위에 시각화해보자.
+
+<br/>
+
+```{r graph4}
+
+library(ggmap)
+
+#새로운 데이터 metr_coord를 metro변수에 불러온다.
+metro <- read.csv("C:/Users/chk/Documents/metro_coord.csv")
+str(metro)
+
+#위에서 사용한 subway 데이터를 위와 동일하게 가공해 real_data4변수에 저장한다.
+real_data4 <- subway %>% gather(key ='시간', value ='승하차인원',X04...05:X03...04)
+real_data4 %>% head(10)
+
+#7호선의 데이터만 필요하기 때문에 필터링을 해준다.
+real_data4 <- real_data4 %>% filter(호선=="7호선")
+
+#데이터를 역명별로 승하차인원을 합하여 total 변수에 저장한다.
+real_data4 <- real_data4 %>% group_by(역명) %>% summarise(total = sum(승하차인원))
+real_data4 %>% head(30)
+
+#위에서 가공한 데이터를 metro 데이터와 합쳐 total_data에 저장한다.
+total_data <- left_join(real_data4,metro,by="역명")
+total_data
+
+#total_data에서 필요한 coloumn들만 남기기 위해 필요하지 않는 coloumn은 제거한다.
+total_data <- total_data[,-c(3, 4, 5)]
+
+#지도를 정의하기 위해 위도/경도를 bbox_seoul 변수에 입력해준다.
+bbox_seoul <- c(left = 126.826128, bottom = 37.458073, right = 127.194848, top = 37.696073)
+
+#get_stamenmap()으로 지도를 불러온 뒤, ggmap()으로 시각화한다.
+#bbox, zoom, maptype 등을 이용해 다양하게 시각화를 할 수 있다.
+seoul <- get_stamenmap(bbox = bbox_seoul, zoom = 12, maptype = "terrain")
+ggmap(seoul)
+
+ggmap(seoul, base_layer = ggplot(data=total_data, aes(x=lon, y=lat, size=total))) + geom_point(color = "red", alpha= 0.5) + 
+theme_void() + labs(title="7호선 지하철역 유동인구 분포", subtitle="2019년 11월", alpha="유동인구수", size="유동인구수") + theme(text= element_text(size=10))
+
+
+ggmap(seoul, base_layer = ggplot(data=total_data, aes(x=lon, y=lat, size=total))) + geom_point(color = "red", alpha= 0.5) + geom_text(aes(label=역명),check_overlap = T) + theme_void() + labs(title="7호선 지하철역 유동인구 분포", subtitle="2019년 11월", alpha="유동인구수", size="유동인구수") + theme(text= element_text(size=10))
+
+
+```
+
+
+
+

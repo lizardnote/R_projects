@@ -1,0 +1,498 @@
+---
+title: "Assignment#6"
+author: "20182477 김효재"
+date: '2021 5 23 '
+output: 
+  html_document: 
+    theme: cosmo
+---
+
+## Sentiment Analysis on Twitter Dataset
+
+<br/>
+
+"Tweets.csv" 파일은 트위터에서 미국의 6개 항공사(American, Delta, SouthWest, United, US Airways, Virgin America)를 언급하는 tweet 14,640개에 대한 정보를 수집한 데이터셋으로, 본 과제에서는 다음 두 변수 를 활용한다. 변수 airline_sentiment는 각 tweet 텍스트가 항공사에 대한 긍정적인 내용인지, 부정적인 내용인지, 중립적인 내용인지에 따라 positive, negative, neutral로 분류한 결과를 나타낸다. 본 과제에서는 tweet 텍스트로부터 positive/negative/neutral 여부를 판별하기 위한 모델을 만들어본다.
+
+<br/>
+
+#### \#1. 모델 수립하기 전에 데이터의 특성을 분석한다. 시각화 도구를 적절히 활용하자.
+
+<br/>
+
+```{r}
+#필요한 패키지를 불러오자
+library(ggplot2)
+library(wordcloud)
+library(tm)
+library(RColorBrewer)
+library(dplyr)
+
+
+#사용할 데이터파일을 불러오자. 이때 문자열이 모두 factor로 변환되지 않도록 옵션을 추가로 설정해준다.
+tweets <- read.csv("C:/Users/chk/Documents/Tweets_win.csv", stringsAsFactors = FALSE)
+
+#데이터의 구조와 이름을 확인해보자. 이번 과제에서 사용할 변수는 airline_sentiment와 text 변수이다.
+str(tweets)
+names(tweets)
+
+#사용할 변수에 어떤 데이터가 있는지 확인해보면 아래와 같다.
+tweets$airline_sentiment %>% head(10)
+tweets$text %>% head(5)
+
+#dataframe을 생성한다. 이때 target변수는 factor로 변환해주자.
+df<- data.frame(sentiment = factor(tweets$airline_sentiment), text = tweets$text)
+str(df)
+
+
+#Visualization=======================================================
+
+#group_by()를 사용할 경우 출력결과가 데이터프레임이 아닌 tibble 형태로 생성된다.
+sentiment = tweets %>% group_by(airline_sentiment) %>% summarise(count = n())
+sentiment <- sentiment[order(sentiment$airline_sentiment, decreasing=TRUE),]
+
+#airline_sentiment의 분포를 확인해보자
+ggplot(data=sentiment, aes(x=reorder(airline_sentiment,count), y= count)) + geom_bar(stat="identity")+ labs(x="airline_sentiment",title="airline_sentiment_barplot")
+
+ggplot(data=sentiment,aes(x="",y=count,fill=airline_sentiment))+geom_bar(width=1,stat="identity")+ geom_text(aes(y = count/3 + c(0, cumsum(count)[-length(count)]), 
+label=count), size=4)+coord_polar("y") + labs(title="airline_sentiment_Piechart")
+
+#wordcloud를 활용해 시각화해보자
+#메세지별로 분리해준다.
+positive <- subset(df, sentiment=="positive")
+neutral <- subset(df, sentiment=="neutral")
+negative <- subset(df, sentiment=="negative")
+
+#wordcloud를 생성한다. 최대 단어의 개수는 50개로 설정했다.
+wordcloud(positive$text, max.words=50, colors=brewer.pal(8, "Dark2"))
+wordcloud(neutral$text ,max.words=50, colors=brewer.pal(8, "Dark2"))
+wordcloud(negative$text, max.words=50, colors=brewer.pal(8, "Dark2"))
+
+```
+
+<br/>
+
++------------+--------------------------------------------------------------+
+| sentiment  | words                                                        |
++============+==============================================================+
+| positive   | southwestair, united, americanair, thank, flight             |
++------------+--------------------------------------------------------------+
+| neutral    | southwestair, united, jetblue, americanair, flight, can, get |
++------------+--------------------------------------------------------------+
+| negative   | americanair, southwestair, flight, usairways                 |
++------------+--------------------------------------------------------------+
+
+-   위를 살펴보면, southwestair, americanair, united, flight등 감정 판단과 관련없는 항공사 이름/단어들이 자주 등장하는 것을 볼 수 있다.
+
+    +--------------+-------------------------------------------------------+
+    | sentiment    | words                                                 |
+    +==============+=======================================================+
+    | positive     | thank, best, love, good, great, appreciate            |
+    +--------------+-------------------------------------------------------+
+    | neutral      | thanks please need cancelled help                     |
+    +--------------+-------------------------------------------------------+
+    | negative     | delayed please late don't never hold                  |
+    +--------------+-------------------------------------------------------+
+
+-   아까보다는 적게 등장하지만 감정 판단에 영항을 미칠 것으로 보이는 단어들은 위와 같음을 확인할 수 있다.
+
+-   positive와 negative 단어들은 비교가 되지만 neutral은 크게 감정 판단에 영향을 줄 것으로 보이는 단어들을 파악하기 힘들다. 분석에 있어서도 nuetral을 예측하는 것이 어려울 것 같다.
+
+<br/>
+
+#### \#2. 텍스트 데이터에 bag-of-words 기법을 적용하기 위해 적절한 preprocessing을 수행하고, 그 결과를 분석해보자.
+
+<br/>
+
+```{r}
+library(SnowballC)
+
+#corpus(말뭉치)를 생성하자.
+corpus <- VCorpus(VectorSource(df$text))
+corpus
+ 
+#inspect 함수를 사용해 document를 확인하자. 
+#preprocessing 과정에서 계속 확인하기 위해 대소문자, 숫자, 문장부호 등이 포함된 1007번째 document를 선택했다.
+inspect(corpus[[1007]])
+inspect(corpus[[1007]])$content
+
+#대문자를 소문자로 변환하자
+corpus_clean1 <- tm_map(corpus, content_transformer(tolower))
+corpus_clean1[[1007]]$content
+
+#숫자를 제거해준다
+corpus_clean2 <- tm_map(corpus_clean1, removeNumbers)
+corpus_clean2[[1007]]$content
+
+#stopwords를 제거한다.
+corpus_clean3 <- tm_map(corpus_clean2, removeWords, stopwords())
+corpus_clean3[[1007]]$content
+
+#문장부호를 제거하자
+corpus_clean4 <- tm_map(corpus_clean3, removePunctuation)
+corpus_clean4[[1007]]$content
+
+#단어들의 어간을 제거하는 stemming을 진행한다.
+corpus_clean5 <- tm_map(corpus_clean4, stemDocument)
+corpus_clean5[[1007]]$content
+
+#마지막으로 공백을 제거해준다.
+corpus_clean <- tm_map(corpus_clean5, stripWhitespace)
+corpus_clean[[1007]]$content
+
+#잘 적용된 것을 확인할 수 있다. 단어의 개수 또한 139개 -> 50개로 줄어들었다. 
+inspect(corpus[[1007]])$content
+inspect(corpus_clean[[1007]])$content
+
+#DocumentTermMatrix() 함수를 사용하여 document-term matrix(sparse matrix)를 생성하자.
+dtm <- DocumentTermMatrix(corpus_clean)
+dtm
+inspect(dtm[1:5, 1:10])
+
+#200번 이상 발생하는 단어를 출력해 확인해보자
+findFreqTerms(dtm, lowfreq=300)
+
+#텍스트 차원을 줄이기 위해 특정 빈도 이하로 발생하는 단어는 DTM에서 제거하자.
+#전체 0.5% 미만의 document에서 발생하는 단어를 제외하자
+#단어의 수가 너무 적거나 많으면 overfitting 이나 underfitting이 생길 수 있으니 유의한다.
+dtm2 <- removeSparseTerms(dtm, 0.995)
+dtm2
+
+#weightTfIdf() 함수를 사용하면 TF-IDF 값을 계산할 수 있다.
+#값이 크다는 건 - corpus 전체에서는 상대적으로 적게, document에서는 상대적으로 많이 발생함을 의미한다.
+tf_idf <- weightTfIdf(dtm)
+inspect(tf_idf[1:5,])
+
+
+#다음 문제에서 tf_idf/dtm 사용에 따라 accuracy가 바뀔 수 있다. 위와 동일한 방법으로 tf_idf도 전체 0.5% 미만의 document에서 발생하는 단어를 제외한다.
+tf_idf2 <- removeSparseTerms(tf_idf, 0.995)
+tf_idf2
+
+
+```
+
+<br/>
+
+-   1007번째 document를 살펴보면 data preprocessing이 잘 처리된 것을 볼 수 있다.
+
+단어의 개수도 139개에서 50개로 줄어든 것을 확인했다.
+
+-   200번 이상 등장하는 단어들을 살펴보면 agent, airlin, airport 등이 있었는데
+
+    airlin은 data preprocessing 과정 중 airline의 어미를 제거하면서 변형된 단어로 보인다.
+
+    그 외에는 flight, 항공사, board, plane 등의 단어들을 볼 수 있었는데, 감정 판단에 의미있는 변수들은 아닌것으로 보인다.
+
+-   DTM과 tf_idf는 14640개의 document와 11284개의 word(column)으로 구성된 것을 확인할 수 있다. 각각 0.5% 미만으로 발생하는 단어는 제거해주었고, 11284에서 330개로 줄어든 것을 확인할 수 있다.
+
+<br/>
+
+#### \#3. 계산 시간을 줄이기 위해서 첫 5,000개의 데이터만 training set으로 사용하고, 나머지 모든 데이터를 test set으로 사용한다. Training set을 사용하여 predictive model을 만들어보자.
+
+<br/>
+
+##### 3-1) 지금까지 학습한 모델을 최대한 활용해보고, 분석 과정과 결과를 report하자. 사용하는 모델, 모델에 포함되는 파라미터에 대한 튜닝, 모델에 포함되는 feature의 수, DTM/TF-IDF 사용 여부 등이 classification accuracy에 영향을 미칠 수 있다.
+
+<br/>
+
+```{r}
+#필요한 패키지 업로드
+library(rsample)
+library(randomForest)
+library(nnet)
+library(caret)
+library(vip)
+library(e1071)
+
+#processing이 끝난 DTM2을 데이터프레임으로 변환하자.
+dtm_df <- data.frame(as.matrix(dtm2))
+str(dtm_df)
+
+#마찬가지로 tf_idf2도 데이터프레임으로 변환하자.
+tf_idf_df <- data.frame(as.matrix(tf_idf2))
+str(tf_idf_df)
+
+
+#feature의 이름을 적당한 형태로 조정해주고, target변수를 추가하자.
+colnames(dtm_df) <- make.names(colnames(dtm_df))
+dtm_df$sentiment <- df$sentiment
+str(dtm_df)
+
+colnames(tf_idf_df) <- make.names(colnames(tf_idf_df))
+tf_idf_df$sentiment <- df$sentiment
+str(tf_idf_df)
+
+
+# Data Splitting=====================================================
+#이번 과제에서는 계산시간을 줄이기 위해 첫 5000개 데이터만 사용
+# Train set과 Test set으로 분할하자.
+TrainD <- dtm_df[1:5000,]
+TestD <- dtm_df[-c(1:5000),]
+
+TrainI <- tf_idf_df[1:5000,]
+TestI <- tf_idf_df[-c(1:5000),]
+
+#initial_split 사용해 비슷한 비율로 validation set을 만들어주자.
+set.seed(123)
+split <- initial_split(TrainD, prop =0.8, strata = "sentiment")
+trainD <- training(split)
+testD <- testing(split)
+
+set.seed(123)
+Split <- initial_split(TrainI, prop =0.8, strata = "sentiment")
+trainI<- training(Split)
+testI <- testing(Split)
+
+
+#비슷하게 배분된 것을 확인할 수 있다.
+table(trainD$sentiment)
+table(testD$sentiment)
+
+table(trainI$sentiment)
+table(testI$sentiment)
+```
+
+```{r}
+
+#Multi-class Classification=====================================================================
+#e1071 패키지의 svm() 함수는 multi class classification 문제를 one-versus-one classificationd으로 적용한다. 
+
+#cost와 gamma 파라미터는 10^x이나 2^x 단위로 tuning을 시도해보는 것이 바람직하다.
+set.seed(123)
+tune.out <- tune(svm, sentiment~., data=trainD, kernel="radial",
+                 ranges=list(cost=c(0.01, 0.1, 1, 10, 100),
+                             gamma=c(0.01, 0.1, 1, 10, 100)))
+
+summary(tune.out)
+
+#test set(valid set)에 대한 class 예측 후 confusion matrix 계산
+pred_svm <- predict(tune.out$best.model, newdata=testD)
+confusionMatrix(pred_svm, testD$sentiment)
+
+#____________________________________________________________________
+#Multi-class Classification TF-IDF로 위와 동일한 과정을 수행한다.
+
+
+#cost와 gamma 파라미터는 10^x이나 2^x 단위로 tuning을 시도해보는 것이 바람직하다.
+set.seed(123)
+tune.out1 <- tune(svm, sentiment~., data=trainI, kernel="radial",
+                 ranges=list(cost=c(0.01, 0.1, 1, 10, 100, 100),
+                             gamma=c(0.01, 0.1, 1, 10, 100)))
+
+summary(tune.out1)
+
+#test set(valid set)에 대한 class 예측 후 confusion matrix 계산
+pred_svm1 <- predict(tune.out1$best.model, newdata=testI)
+confusionMatrix(pred_svm1, testI$sentiment)
+
+
+#Bagging=============================================================
+#random Forest_bagging model- DTF
+
+#trainset에 bagging 적용(mtry=p로 설정하면 bagging을 적용하는 것과 같다.)
+set.seed(123)
+bag <- randomForest(sentiment~. , data= trainD, ntree=300, mtry=331)
+bag
+
+#bagging model의 out-of bag prediction과 error rate
+head(bag$predicted)
+head(bag$err.rate)
+
+#시각화
+plot(bag)
+
+#feature들의 중요도를 확인해보자
+vip(bag)
+bag$importance
+
+#bagging 모델의 test(valid) set에 대한 class 예측
+pred_bag <- predict(bag, newdata = testD, type="class")
+#위 결과를 confusionMatrix로 확인
+confusionMatrix(factor(pred_bag),testD$sentiment)
+
+#____________________________________________________________________
+#random Forest_bagging model- TF-IDF로 위와 동일한 과정을 수행한다
+
+set.seed(123)
+bag1 <- randomForest(sentiment~. , data= trainI, ntree=300, mtry=331)
+bag1
+
+#bagging model의 out-of bag prediction과 error rate
+head(bag1$predicted)
+head(bag1$err.rate)
+
+#시각화
+plot(bag1)
+
+#feature들의 중요도를 확인해보자
+vip(bag1)
+bag1$importance
+
+#bagging 모델의 test(valid) set에 대한 class 예측
+pred_bag1 <- predict(bag1, newdata = testI, type="class")
+#위 결과를 confusionMatrix로 확인
+confusionMatrix(factor(pred_bag1),testI$sentiment)
+
+#RandomForest========================================================
+#DTM 사용
+#randomForest는 Cross Validation 적용 시 너무 오래 걸리기 때문에 out-of-bag error를 최소화하는 mtry값을 찾아보자.
+
+#1~50까지 mtry값에 대해 random forest 생성하고 error rate를 저장한다.
+oob <- vector()
+for(i in seq(1,50,2)){
+        set.seed(123)
+        rf <- randomForest(sentiment~., data=trainD, ntree= 50, mtry=i )
+        oob <- c(oob, rf$err.rate[50,1])
+}
+
+#error rate가 가장 작을 때의 mtry 값을 찾는다.
+which.min(oob)
+
+#randomForest함수를 이용해 randomForest model 만들자. 앞에서 찾은 mtry값을 사용한다.
+set.seed(123)
+RF_D <- randomForest(sentiment~., data=trainD, mtry=5, ntree=300)
+
+#시각화
+plot(RF_D)
+RF_D
+
+#randomForest의 out-of bag prediction과 error rate
+head(RF_D$predicted)
+head(RF_D$err.rate)
+
+#test set(valid set)에 대한 class 예측 후 confusion matrix 계산하자.
+pred_RF_D <- predict(RF_D, newdata=testD, type="class")
+confusionMatrix(pred_RF_D, testD$sentiment, positive = "positive")
+
+#____________________________________________________________________
+#random Forest TF-IDF로 위와 동일한 과정을 수행한다.
+
+#1~50까지 mtry값에 대해 random forest 생성하고 error rate를 저장한다.
+oob_I <- vector()
+for(i in seq(1,50,2)){
+        set.seed(123)
+        rfI <- randomForest(sentiment~., data=trainI, ntree= 50, mtry=i )
+        oob_I <- c(oob_I, rfI$err.rate[50,1])
+}
+
+#error rate가 가장 작을 때의 mtry 값을 찾는다.
+which.min(oob_I)
+
+#randomForest함수를 이용해 randomForest model 만들자. 앞에서 찾은 mtry값을 사용한다.
+set.seed(123)
+RF_I <- randomForest(sentiment~., data=trainI, mtry=30, ntree=300)
+
+#시각화
+plot(RF_I)
+RF_I
+
+#randomForest의 out-of bag prediction과 error rate
+head(RF_I$predicted)
+head(RF_I$err.rate)
+
+#test set(valid set)에 대한 class 예측 후 confusion matrix 계산하자.
+pred_RF_I <- predict(RF_I, newdata=testI, type="class")
+confusionMatrix(pred_RF_I, testI$sentiment, positive = "positive")
+
+
+#====================================================================
+#예측할 class가 3개이기 때문에 다항로지스틱 회귀분석을 진행한다. nnet패키지의 multinorm()을 glm()과 동일한 방식으로 사용한다.
+#DTM을 사용한다.
+
+#multinom함수를 사용해 모델을 만들자
+multinom_model <- multinom(sentiment~., data = trainD)
+
+summary(multinom_model)
+
+#위 모형이 주어진 데이터에 어떻게 적합되었는지 fitted() 함수를 이용하여 구할 수 있다.
+#첫 6개의 데이터만 살펴보면 negative,positive,neutral,negative,negative, negative 로 분류된 것을 볼 수 있다.
+head(round(fitted(multinom_model), 2))
+
+exp(coef(multinom_model))
+
+# valid set(testI)로 예측한 뒤 Building classification table
+testD$ClassPredicted <- predict(multinom_model, newdata = testD, "class")
+
+tab <- table(testD$sentiment, testD$ClassPredicted)
+tab
+#확률로 구해본다면 아래와 같다.
+round((sum(diag(tab))/sum(tab))*100,2) 
+
+testD$ClassPredicted
+
+#____________________________________________________________________
+#multinom_TF-IDF
+
+#tf_idf를 사용해 multinom 모델을 만들자
+multinom_model1 <- multinom(sentiment~ ., data = trainI)
+
+#위 모형이 주어진 데이터에 어떻게 적합되었는지 fitted() 함수를 이용하여 구할 수 있다.
+#첫 6개의 데이터만 살펴보면 neutral, positive, neutral, negative, negative, negative 로 분류된 것을 볼 수 있다.
+head(round(fitted(multinom_model1), 2))
+
+# valid set(testI)로 예측한 뒤 Building classification table
+testI$ClassPredicted <- predict(multinom_model1, newdata = testI, "class")
+ 
+tab1 <- table(testI$sentiment, testI$ClassPredicted)
+tab1
+#확률로 구해본다면 아래와 같다.
+round((sum(diag(tab1))/sum(tab1))*100,2) 
+
+```
+
+<br/>
+
+| model         | Accuracy |
+|---------------|----------|
+| model1_DTM    | 0.7505   |
+| model1_TF_IDF | 0.7335   |
+| model2_DTM    | 0.7104   |
+| model2_TF_IDF | 0.6964   |
+| model3_DTM    | 0.7435   |
+| model3_TF_IDF | 0.7285   |
+| model4_DTM    | 0.7395   |
+| model4_TF_IDF | 0.7295   |
+
+##### \#3-2. 최종적으로 선택한 모델은 무엇이며 test set에 대한 accuracy는 얼마인가?
+
+```{r}
+#TestD와 TestI를 accuracy가 가장 높은 모델에 적용해본다.
+#accuracy를 높이기 위해 TrainD(training set+validation set)를 사용한다.
+
+#TrainD 사용해 tuning
+set.seed(456)
+tune <- tune(svm, sentiment~., data=TrainD, kernel="radial",
+                 ranges=list(cost=c(0.01, 0.1, 1, 10, 100),
+                             gamma=c(0.01, 0.1, 1, 10, 100)))
+
+summary(tune)
+
+#TestD에 대한 class 예측 후 confusion matrix 계산
+final_predict <- predict(tune$best.model, newdata=TestD)
+confusionMatrix(final_predict, TestD$sentiment) 
+
+
+```
+
+-   accuracy가 가장 높았던 model1_DTM 을 선택해서 사용했다.
+
+-   accuracy를 조금 더 높이기 위해 training set과 valid set을 합쳐 Train set으로 model fitting을 진행한 후 최종 Test set으로 검증한 결과
+
+-   TestD의 Accuracy : 73.8%임을 확인했다.
+
+    +-----------------+-----------------+-----------------+-----------------+
+    | ConfusionMatrix | negative        | neutral         | positive        |
+    +=================+=================+=================+=================+
+    | **negative**    | 5237            | 907             | 430             |
+    +-----------------+-----------------+-----------------+-----------------+
+    | **neutral**     | 614             | 974             | 217             |
+    +-----------------+-----------------+-----------------+-----------------+
+    | **positive**    | 197             | 161             | 903             |
+    +-----------------+-----------------+-----------------+-----------------+
+    | Sensitivity     | **0.8659**      | **0.4770**      | **0.5826**      |
+    +-----------------+-----------------+-----------------+-----------------+
+    | Specificity     | 0.6278          | 0.8906          | 0.9558          |
+    +-----------------+-----------------+-----------------+-----------------+
+
+-   위 confusionMatrix를 살펴보면 negative를 가장 잘 분류해 낸 것을 확인할 수 있었다. 그에 비해 neutral과 positive는 상대적으로 sensitivity가 낮고 neutral이 가장 낮게 나타났다.
+
+-   처음 데이터 시각화를 통해 살펴봤을 때 예상했듯이 neutral이 가장 분류하기 힘들다.
