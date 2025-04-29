@@ -1,4 +1,4 @@
-# R Portfolio 📊
+# R mini projects 📊
 
 This repository contains R Markdown assignments from data analysis coursework.  
 Each folder includes the source `.Rmd` file and rendered `.html` output.
