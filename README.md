@@ -1,12 +1,18 @@
-# R mini projects 📊
+# 📊 R Mini Projects
 
-This repository contains R Markdown assignments from data analysis coursework.  
-Each folder includes the source `.Rmd` file and rendered `.html` output.
+This repository contains several R Markdown-based data analysis mini projects.  
+Each folder includes the `.Rmd` source file and a rendered `.html` output.  
+You can directly view the results using the links below.
 
-## Contents
-- Project 1: [EDA on survey data](assignments/assignment-1/assignment-1.html)
-- Project 2: [Clustering mall customers](assignments/assignment-2/assignment-2.html)
-- Project 3: [Linear Regression Analysis](assignments/assignment-3/assignment-3.html)
-- Project 4:
-- Project 5:
-- Project 6:
+---
+
+## 🔗 Project List
+
+| Project | Description | HTML Result |
+|---------|-------------|-------------|
+| Project 1 | Intro to R & Data Exploration | [View](https://lizardnote.github.io/R_projects/project_1/project_1.html) |
+| Project 2 | Customer Segmentation with K-means | [View](https://lizardnote.github.io/R_projects/project_2/project_2.html) |
+| Project 3 | Linear Regression on Housing Prices | [View](https://lizardnote.github.io/R_projects/project_3/project_3.html) |
+| Project 4 | Predicting Delayed Flights | [View](https://lizardnote.github.io/R_projects/project_4/project_4.html) |
+| Project 5 | Handwritten Digit Recognition | [View](https://lizardnote.github.io/R_projects/project_5/project_5.html) |
+| Project 6 | Sentiment Analysis on Twitter Dataset | [View](https://lizardnote.github.io/R_projects/project_6/project_6.html) |
