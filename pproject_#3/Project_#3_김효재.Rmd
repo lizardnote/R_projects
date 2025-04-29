@@ -1,0 +1,637 @@
+---
+title: 'Assignment #3'
+author: "20182477 김효재"
+date: '2021 4 11 '
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Climate Change 
+
+ClimateChange 데이터에 Temp 변수를 target으로, Year 및 Month를 제외한 나머지 8개의 변수를 feature로 사용하자.
+
+<br />
+
+### 1-1번
+Year 및 Month를 제외한 9개의 변수들 간의 상관 관계를 다양한 그래프를 활용하여 시각화해보고, 이로부터의 데이터의 특성을 분석해보자
+
+```{r}
+
+#사용할 패키지를 불러온다.
+
+library(GGally)
+library(corrplot)
+library(psych)
+
+#데이터를 불러오고 Year, Month를 제외한 변수들을 다시 저장해준다.
+climate <- read.csv("C:/Users/chk/Documents/ClimateChange.csv")
+str(climate)
+climate1 <- climate[,-c(1,2)]
+str(climate1)
+
+#변수들 간 상관관계를 그래프를 그려 확인해보자
+#ggally 패키지의 ggpairs 함수를 이용해보자
+ggpairs(climate1)
+
+#corrplot 패키지의 corrplot 함수를 이용해보자
+climate_cor <-cor(climate1)
+corrplot(climate_cor, method="shade", diag=FALSE, addshade="all",tl.srt=45, addCoef.col="black")
+
+#psych 패키지의 pairs.panels 함수를 이용해보자
+pairs.panels(climate1, main = "변수들의 상관관계 scatter-plot matrix, correlation coef, histogram")
+
+```
+
+<br />
+
+1-1번 답변
+
+<br />
+
+위 그래프들은 각 feature들의 모든 조합에 대한 상관관계를 보여주고 있다. 데이터 특성에 따라 boxplot, histogram, scatter plot 등 여러가지로 나타낼 수 있다.
+1번, 2번 그래프의 대각선 기준 오른쪽 상단 숫자들은 상관계수 값을 보여준다. 이 값들은 두번째 그래프에서도 동일하게 나타나고 있는 것을 볼 수 있다.
+<br />
+Target변수와 다른 feature들의 관계를 살펴보자
+Temp와 Aerosols과는 음의 상관관계를 보이고 있다. 또한 CO2 ,CH2, N2O, CFC.12와는 강한 양의 상관관계 나타내며,
+MEI, CFC.11, TSI와는 약한 양의 상관관계를 나타내고 있다.
+<br />
+그리고 전체적으로 변수들간의 상관관계를 봤을 때,
+MEI는 다른 여러 변수들(CO2, CH4, N2O, CFC.12, TSI)과 음의 상관관계(주황색)를 보이며 
+Aerosols도 마찬가지로 여러 변수들(CO2 ,CH2, N2O, CFC.11, CFC.12, Temp)과 음의 상관관계(주황색)에 있음을 확인할 수 있다. 또한 1에 가까운 상관계수를 보이는(2번 그래프 기준 짙은 파랑색) 변수들은 다중공산성을 의심해 봐야한다.
+
+<br />
+
+### 1-2번
+
+2004년 이후의 데이터를 test set으로 2003년까지의 데이터를 training set으로 분할하자. 그리고 training set을 활용하여 linear regression model을 수립하자. 이때 8개의 feature 변수를 모두 포함시킨다. 
+
+```{r}
+#사용할 패키지를 불러온다.
+library(vip)
+library(ggplot2)
+
+#먼저 2004년 이후 데이터는 test set, 이전 데이터는 training set으로 나눠준다.
+
+climate <- read.csv("C:/Users/chk/Documents/ClimateChange.csv")
+str(climate)
+
+cTrain <- subset(climate,Year <= 2003)
+cTest <- subset(climate, Year > 2003 )
+
+cTrain %>% head(10)
+cTrain %>% tail(10)
+cTest %>% head(10)
+cTest %>% tail(10)  
+
+#위와 동일하게 Year Month 변수는 제거한다.
+cTest <- cTest[,-c(1,2)]
+cTrain <- cTrain[,-c(1,2)]
+
+#train set과 test set 의 분포를 확인해보자
+ggplot(data=cTrain, aes(x=Temp)) + geom_density() + geom_density(data=cTest, aes(x=Temp), color="red") + theme_bw()
+
+#linear regression model을 수립한다.
+model1 <- lm(Temp ~ .,  data=cTrain)
+summary(model1)
+
+#어떤 변수의 영향력이 가장 큰지 보여준다. linear regression에서는 변수들의 t-value값이 기준이 된다. 
+vip(model1)
+
+#N2O, CFC.11, temp 변수들의 관계만 그래프로 다시 확인해보자
+N2O <- cTrain$N2O
+CFC.11 <- cTrain$CFC.11
+Temp <- cTrain$Temp
+
+pairs( cbind(N2O,CFC.11,Temp), panel=function(x,y){
+  points(x,y)
+  abline(lm(y~x), col="red", lwd= 3)
+})
+
+```
+<br />
+
+a) 어떠한 feature들이 Temp에 큰 영향을 미치는가?
+
+<br />
+
+ linear regression model의 summary 결과와 vip 그래프를 확인해보면
+ MEI, Aerosols, TSI,  CFC.11, CFC.12, 순으로 유의하고, CO2, N2O가 그 다음으로 영향을 미친다는 것을 확인할 수 있다.
+
+<br />
+
+b) N2O와 CFC-11은 지구의 지표면에서 우주로 발산하는 적외선 복사열을 흡수하여 지구 표면의 온도를 상승시키는 역할을 하는 온실가스로 알려져 있다. 모델에서 N2O와 CFC-11 변수의 coefficient는 양수 값을 가지는가? 음수 값을 가지는가? 만약 음수값을 가진다면 N2O와 CFC-11의 양이 증가할수록 평균 기온이 감소한다는 것을 의미하므로 일반적인 지식과 모순된다. 이러한 모순된 결과가 도출되는 원인은 무엇일까?
+
+<br />
+
+1-1번에서 그린 그래프와 2번에서 그린 마지막 그래프를 보면 N2O와 CFC.11은 Temp와 모두 양의 상관관계를 띄는 것이 명백하다. 하지만 이 모델에서는 N2O와 CFC.11의 coefficient는 음수값을 보이고 있다. 
+이러한 모순된 결과가 도출되는 원인은 모델을 만들어 회귀분석을 진행할 때,
+다른 변수들 간의 상관관계를 전혀 고려하지 않고 모든 변수들을 넣어 회귀분석을 진행했기 때문에 다른 변수들이 두 변수에 영향을 미쳤다고 볼 수 있다. 
+
+<br />
+
+### 1-3번
+
+MEI, TSI, Aerosols, N2O 4개의 feature만 사용하여 regression model을 만들어 보자.
+
+```{r}
+
+#필요한 패키지를 불러온다.
+library(caret)
+
+#위와 같은 방법으로 4개의 feature만 사용해 회귀분석을 진행한다.
+model2 <- lm(Temp ~ MEI + TSI + Aerosols + N2O,  data=cTrain)
+summary(model2)
+
+#어떤 변수의 영향력이 가장 큰지 보여준다.
+vip(model2)
+
+#두 모델의 coefficient 비교한다.
+coefficients(model1)
+coefficients(model2)
+
+#두 모델의 test set을 이용해 RMSE 비교한다.
+cTest_pred <- predict(model1, cTest)
+cTest_pred2 <- predict(model2, cTest)
+
+RMSE(cTest_pred, cTest$Temp)
+RMSE(cTest_pred2, cTest$Temp)
+
+```
+<br />
+
+a) N2O 변수의 coefficient를 2번 모델과 비교해 보자.  
+
+<br />
+
+model2의 N2O변수의 coefficient는  -2.524859e-02
+model1의 N2O변수의 coefficient는   0.02524039
+즉 모델에 어떤 feature들을 넣고 회귀분석을 진행하냐에 따라 추정된 회귀식의 계수가 달라진다.
+
+<br />
+
+b) 두 모델의 Multiple R-squared값, Adjusted R-squared값, test set error (test set에 대한 RMSE)를 비교해 보자. 어떤 모델을 선택하겠는가?  
+
+<br />
+
+model1 
+Multiple R-squared:  0.7133,	Adjusted R-squared:  0.7037 , RMSE : 0.08439069
+model2
+Multiple R-squared:  0.6799,	Adjusted R-squared:  0.6747 , RMSE : 0.08501107
+
+Multiple R-squared과 Adjusted R-squared 모두 1에 가까울 수록 회귀계수의 설명력이 높음을 의미한다.
+결정계수는 독립변수가 많아질 수 록 증가하는 특징을 가지고 있는데 이에 수정된 결정계수를 중심으로 회귀모형의 설명력을 측정한다.
+두 모델 중에서는 1-2의 model1이 더 큰 값을 가지고 있고, 작을 수록 좋은 RMSE 값도 model1이 조금 더 작기 때문에 model1을 선택하는 것이 좋다.
+
+<br />
+
+
+### 1-4번
+
+8개의 feature를 대상으로 cross validation을 활용한 stepwise variable selection을 수행해보자.
+
+```{r}
+
+library(leaps)
+
+# set cross validation option
+train.control <- trainControl(method = "repeatedcv", number = 10, repeats = 10)
+
+set.seed(777)
+fwd_model <- train(Temp ~., data = cTrain, method = "leapForward",
+                   tuneGrid = data.frame(nvmax = 1:8), trControl = train.control)
+fwd_model$results
+fwd_model$bestTune
+
+#그래프를 그려서 확인해보자
+ggplot(fwd_model$results, aes(x=nvmax, y=RMSE)) + geom_point() + geom_line() + theme_bw()
+
+#forward stepwise coefficient를 확인하자
+coef_fwd_cv <- coef(fwd_model$finalModel, fwd_model$bestTune$nvmax)
+coef_fwd_cv
+
+#RMSE 값을 확인하자
+test_pred_fwd_cv <- predict(fwd_model, cTest )
+RMSE(test_pred_fwd_cv, cTest$Temp)
+
+#7개의 변수가 추가된 model의 RMSE 값이 가장 작은 것을 확인할 수 있다. 이 model의 test RMSE값은 0.08359067이다.
+
+# Backward stepwise selection------
+
+set.seed(777)
+bwd_model <- train(Temp ~., data = cTrain, method = "leapBackward",
+                   tuneGrid = data.frame(nvmax = 1:8), trControl = train.control)
+bwd_model$results
+bwd_model$bestTune
+
+#마찬가지로 backward stepwise selection 수행결과도 그래프를 그려보자
+ggplot(bwd_model$results, aes(x=nvmax, y=RMSE)) + geom_point() + geom_line() + theme_bw()
+
+#위와 동일하게 진행한다.
+test_pred_bwd_cv <- predict(bwd_model, cTest )
+test_pred_bwd_cv
+
+RMSE(test_pred_bwd_cv, cTest$Temp)
+
+#동일하게 7개의 변수가 추가된 model의 RMSE 값이 가장 작은 것을 확인할 수 있다. 이 model의 test RMSE값은 0.08359067이다.
+
+#-----마지막으로 training set 과 test set을 모두 포함하는 전체 dataset에 대해 다시 forward stepwise selection을 적용해 best model을 만들자.
+
+
+fwd_best <- regsubsets(Temp~., data = climate1, nvmax = 7, method = "forward")
+fwd_final <- coef(fwd_best, 7)
+
+fwd_final
+
+#앞서 계산한 training set에 대한 model의 coefficient 값과 full dataset에 대해 계산한 modeldml coefficient값이 차이가 나는 것을 볼 수 있다.
+
+```
+<br />
+
+a) Forward selection과 backward selection의 결과를 비교해보자.
+
+<br />
+
+Forward selection :  7개의 feature 선택, test set RMSE 값: 0.08359067
+Backward selection : 7개의 feature 선택, test set RMSE 값: 0.08359067
+두 결과가 동일하다.
+
+<br />
+
+
+b) Prediction accuracy와 Model interpretability를 종합적으로 고려하여 best 모델을 하나 결정하자. 
+
+<br />
+
+7개의 feature(MEI, CO2, N2O, CFC.11, CFC.12, TSI, Aerosols)를 이용한 model이 가장 적합하다.
+
+<br />
+
+
+### 1-5번
+
+Prediction accuracy를 높이기 위해 기존 8개의 feature들 외에 feature들 사이의 모든 interaction effect, 그리고 CO2, CFC.11, CFC.12의 제곱항들을 모두 추가한 모델을 대상으로 cross validation을 활용한 stepwise variable selection을 수행해보자.
+
+```{r}
+#모든 feature들 사이의 곱과 CO2, CFC.11, CFC.12의 제곱항들을 모델에 추가해보고 그래프로 확인해보자
+model1.5 <- lm(Temp ~(.)^2 + I(CO2^2) + I(CFC.11^2) + I(CFC.12^2), data = cTrain)
+summary(model1.5)
+vip(model1.5)
+
+#forward stepwise selection
+# 기존 feature 8개 + feature들 사이의 모든 곱 8C2 + 제곱항 3개 = 39를 nvmax로 설정
+set.seed(777)
+fwd_model2 <- train(Temp ~(.)^2 + I(CO2^2) + I(CFC.11^2) + I(CFC.12^2), data = cTrain, method = "leapForward", tuneGrid = data.frame(nvmax = 1:39), trControl = train.control)
+
+fwd_model2$results
+fwd_model2$bestTune
+
+
+#그래프로도 확인해 볼 수 있다.
+ggplot(fwd_model2)
+
+coef_fwd_cv2 <- coef(fwd_model2$finalModel, 14)
+coef_fwd_cv2
+
+test_pred_fwd2 <- predict(fwd_model2, cTest)
+RMSE(test_pred_fwd2, cTest$Temp)
+
+
+# Backward stepwise selection
+# 기존 feature 8개 + feature들 사이의 모든 곱 8C2 + 제곱항 3개 = 39를 nvmax로 설정
+
+set.seed(777)
+bwd_model2 <- train(Temp ~(.)^2 + I(CO2^2) + I(CFC.11^2) + I(CFC.12^2), data = cTrain, method = "leapBackward", tuneGrid = data.frame(nvmax = 1:39), trControl = train.control)
+
+bwd_model2$results
+bwd_model2$bestTune
+
+#그래프로도 확인해보자
+ggplot(bwd_model2)
+
+coef_bwd_cv2 <- coef(bwd_model2$finalModel, 20)
+coef_bwd_cv2
+
+test_pred_bwd2 <- predict(bwd_model2, cTest)
+RMSE(test_pred_bwd2, cTest$Temp)
+
+# ---위와 동일하게 best model을 찾는다.
+
+fwd_best2 <- regsubsets(Temp~(.)^2 + I(CO2^2) + I(CFC.11^2) + I(CFC.12^2), data = climate1, nvmax = 14 , method = "forward")
+fwd_final2 <- coef(fwd_best2, 14)
+fwd_final2
+
+
+```
+<br />
+
+a) Forward selection과 backward selection의 결과를 비교해보자. 
+
+<br />
+
+위 두개의 그래프와 함께 확인이 가능하다.
+Forward selection ->  RMSE를 최소로 하는 nvmax값: 14 / RMSE: 0.09371814
+Backward selection ->  RMSE를 최소로 하는 nvmax값: 20 / RMSE: 0.2465357 
+으로 결과가 나온 것을 확인할 수 있다.
+
+<br />
+
+b) Cross validated RMSE가 가장 낮은 best 모델을 결정하자. 어떠한 변수들이 best 모델에 포함되는가?
+
+<br />
+
+두 모델 중 RMSE 값이 더 작은 forward stepwise selectiond의 모델을 사용한다.
+또한 예측의 정확도를 충분히 높이면서 최대한 단순한 model을 만들때는 작은 nvmax를 선택하는 것도 합리적이다. backward selection의 RMSE 값으로 그린 그래프를 보면 nvmax가 20일때가 가장 낮지만 14일때도 20일때와 비슷하므로 nvmax 값은 forward selection과 동일하게 14로 사용해도 합리적이라고 판단한다.
+
+<br />
+
+
+### 1-6번
+
+a) 2, 3, 4, 5번에서 수립된 4개의 모델에 대해서 test set (2004년 이후 데이터)에 대한 prediction accuracy(RMSE)를 비교해 보자. 예상한 대로 결과가 나오는가? 그렇지 않다면 그 원인은 무엇일지 분석해보자.
+
+```{r}
+RMSE(cTest_pred, cTest$Temp)
+
+RMSE(cTest_pred2, cTest$Temp)
+
+RMSE(test_pred_fwd_cv, cTest$Temp)
+
+RMSE(test_pred_fwd2, cTest$Temp)
+
+
+```
+
+
+------------------------------------------------< 1-6 답변>------------------------------------------------
+
+1-2번) RMSE :  0.08439069
+1-3번) RMSE :  0.08501107
+1-4번) RMSE :  0.08359067
+1-5번) RMSE :  0.09371814
+RMSE 값은 작을수록 좋다. 따라서 가장 작은 1-4)번의 model이 가장 좋은 모델이라고 볼 수 있다.
+
+
+===========================================================================================================
+
+
+## 2. Regression on Simulated Data 
+
+1)먼저 rnorm() 난수함수를 이용하여 평균 0 표준편차 1인 표준정규분포로부터 크기가 200인 벡터 X를 생성해준다. rnorm()함수의 기본셋팅(디폴트)은 표준정규분포 (평균0과 표준편차1)이다. 
+2)다음으로 평균 0 표준편차 4인 정규분포로부터 크기가 200인 오차벡터를 생성하자. rnorm()함수 반복적으로 사용할 때 동일한 random seed값을 사용하지 않도록 주의하자.
+3)크기가 200인 target vector Y를 다음 식을 사용해 생성한다. 
+
+```{r}
+
+#난수 발생은 매번 할 때마다 바뀌게 되므로 set.seed()함수로 고정을 시켜준다. 
+
+#1) vector X 생성
+set.seed(7)
+X <- rnorm(200)
+
+#그래프를 그려 확인해보자 
+hist(X)
+plot(density(X))
+  
+#2) error vector 생성
+set.seed(8)
+Er <- rnorm(200, mean=0, sd=4)
+hist(Er)
+plot(density(Er))
+
+#3) target vector Y 생성
+Y <- 1 + 2*X - 3*X^2 + 4*X^3 + Er
+
+```
+<br />
+
+set.seed()로 고정하지 않으면 다른 숫자, 그래프가 나타나지만 평균 0을 중심으로 좌우 대칭형태의 정규분포를 형태를 띠는 것은 동일하다.
+현재 그래프를 보면 완벽한 정규분포 형태를 보이지는 않지만 그래도 정규분포 모양을 이루고 있고 N=200을 증가시키면 정규분포에 더 가까워질 것이다.
+
+<br />
+
+
+### 2-1번 
+
+X, X^2, X^3, ..., X^10의 10개 변수를 feature로, Y를 target으로 설정하자. 
+이때 feature 변수들과 target 변수 사이의 상관관계를 시각화해보자.
+
+```{r}
+md <- data.frame(X,X^2,X^3,X^4,X^5,X^6,X^7,X^8,X^9,X^10,Y)
+str(md)
+
+#필요한 패키지를 불러온다.
+library(GGally)
+library(corrplot)
+library(psych)
+
+#데이터를 dataframe으로 만들어준다.
+md <- data.frame(X,X^2,X^3,X^4,X^5,X^6,X^7,X^8,X^9,X^10,Y)
+str(md)
+
+#변수들 간 상관관계를 그래프를 그려 확인해보자
+#ggally 패키지의 ggpairs 함수를 이용해보자
+ggpairs(md)
+
+#corrplot 패키지의 corrplot 함수를 이용해보자
+md_cor <-cor(md)
+corrplot(md_cor, method="shade", diag=FALSE, addshade="all",tl.srt=45, addCoef.col="black")
+
+#psych 패키지의 pairs.panels 함수를 이용해보자
+pairs.panels(md, main = "변수들의 상관관계 scatter-plot matrix, correlation coef, histogram")
+
+```
+
+<br />
+
+### 2-2번
+
+10개의 feature를 모두 포함하는 linear regressioin model을 만들어보자. 통계적으로 유의한 변수가 있는가? regression coefficient B^j 값을 실제 Bj 값과 비교해보자
+
+```{r}
+
+model2_1 <- lm(Y~.,data=md)
+summary(model2_1)
+
+coefficients(model2_1)
+
+```
+
+<br />
+
+linear regression model의 summary 결과 통계적으로 유의한 변수가 없다.
+추정한 B^j 값은 아래와 같다. 실제 Bj 값과 추정한 값을 비교했을 때 비슷한 값이 없다..
+
+(Intercept)  0.285733   
+X           -0.552580   
+X.2         -0.153083   
+X.3          6.689178   
+X.4         -2.074968   
+X.5         -0.414496   
+X.6          0.447547   
+X.7         -0.148548   
+X.8          0.005971   
+X.9          0.028170   
+X.10        -0.007045  
+
+<br />
+
+
+### 2-3번
+
+X, X^2, X^3의 3개 변수를 feature로, Y를 target으로 linear regression model을 만들어보자. 모든 feature들이 통계적으로 유의한가? regression coefficient B^j 값을 실제 Bj값과 비교해보자.
+
+```{r}
+
+model2_2 <- lm(Y ~ X + X.2 + X.3, data = md)
+summary(model2_2)
+
+coefficients(model2_2)
+```
+
+<br />
+
+linear regression model의 summary 결과 통계적으로 유의한 변수는 X, X.2, X.3 이다.
+추정한 B^j 값은 아래와 같다. Y절편과 B1 추정값이 실제 값보다 조금 작지만 다른 추정치들은 비슷한 결과를 보인다.
+
+<br />
+
+(Intercept)   0.9139756     | (실제 Bj 값) 1 <br />
+X             1.3887648     |              2 <br />
+X.2          -3.0839708     |             -3 <br />
+X.3           4.1506050     |              4 <br />
+
+
+<br />
+
+
+### 2-4번
+
+X, X^2, X^3, ..., X^10의 10개 변수를 feature로, Y를 target으로 Lasso regression model을 만들어본다. Cross validation으로 최적의 모델을 찾아보자.
+
+```{r}
+#필요한 패키지를 불러온다.
+#glmnet 패키지 함수들을 이용하면 ridge, lasso 등의 regularization 기법들을 사용할 수 있다.
+#이번 문제에서는 glmnet function의 alpha=1로 설정하여 lasso regression을 수행한다.
+
+library(caret)
+library(glmnet)
+library(rsample)
+
+
+#lasso regression model을 생성하기 전, 필요한 test set과 train set을 만든 뒤, 그래프로 train set 과 test set의 분포를 확인하자.
+
+set.seed(123)
+split <- initial_split(md, prop=0.7, strata = "Y")
+md_train <- training(split)
+md_test <- testing(split)
+
+ggplot(data=md_train, aes(x=Y)) + geom_density(color="darkred" ) + theme_bw() + geom_density(data=md_test, aes(x=Y), color="darkblue")
+
+#model.matrix() function을 이용해 feature matrix를 생성할 수 있다. 맨 앞에 (Intercept) 열을 제외해준다.
+Xm <- model.matrix(Y~., md_train)[, -1]
+Ym <- md_train$Y
+
+#glmnet 함수의 alpha 값을 1로 설정하여 lasso regression을 수행하고, 그래프로 확인해보자
+lasso <- glmnet(x = Xm, y = Ym, alpha = 1)
+plot(lasso, xvar="lambda", lwd=2)
+
+#50번째 람다값, 30번째 람다값, 10번째 람다값을 보면 점점 커지는 것을 볼 수 있다.
+#그에 따른 regression coefficient를 확인해보면 0인 features수가 더 많아지는 것을 알 수 있다.
+
+lasso$lambda[50]
+lasso$lambda[30]
+lasso$lambda[10]
+
+coef(lasso)[,50]
+coef(lasso)[,30]
+coef(lasso)[,10]
+
+#lasso regression 에 대해 Cross Validation을 수행하고 그래프로 확인해보자.
+#cv.glmnet 함수를 사용하여 lambda에 대한 cross validation을 수행할 수 있다.
+
+set.seed(123)
+cv_lasso <- cv.glmnet(x = Xm, y = Ym, alpha = 1, nfolds = 10)
+plot(cv_lasso)
+
+#best_lambda 값을 확인하자.
+best_lambda_lasso <- cv_lasso$lambda.min
+best_lambda_lasso
+coef(lasso, s= best_lambda_lasso)
+
+#위의 그래프는 log(λ)에 따른 mean-squared error를 나타내며 이를 통해 log(λ)가 -1.1 ~ -1.3 부근에서 오차가 가장 작은 것을 알 수 있다. 
+
+#오차가 가장 작은 λ 값을 정확하게 구할려면 cv.glmnet() 함수의 결과의 lambda.min 원소를 통해 구할 수 있고, 이 결과 가장 작은 λ값은  0.0769이며 log(0.0769)를 계산하면 -1.114 정도 값이 나오는 것을 확인할 수 있다.
+
+#그리고 이때 model에 속하는 feature수는 3~4개 정도로 줄어든다.
+
+#md_test data에 대해 best lambda model의 성능을 평가한다.
+Xm_test <- model.matrix(Y~., md_test)[,-1]
+Ym_test <- md_test$Y    
+
+#caret package의 RMSE 함수 이용
+lasso_pred <- predict(lasso, s = best_lambda_lasso, newx = Xm_test)
+RMSE(lasso_pred, Ym_test)
+
+plot(Ym_test) + lines(lasso_pred, col="red")
+#lasso 모형이 어느 정도는 잘 적합됨을 확인할 수 있다.
+
+#==================================================================================================
+#마지막으로 전체 데이터셋을 대상으로 best lambda 값을 가지는 lasso regression의 최종 model을 만들자
+
+fullX <- model.matrix(Y~., md)[,-1]
+fullY <- md$Y
+
+lasso_full <- glmnet(x=fullX, y= fullY, alpha = 1)
+predict_full <- predict(lasso_full, s = best_lambda_lasso, type="coefficients")
+predict_full
+
+
+```
+<br />
+
+a) 이 모델에는 어떤 변수가 포함되었는가? 
+
+<br />
+
+X, X.2, X.3, X.4, X.9가 포함된다.
+이 중에서 X, X.2, X.3 변수에 비해 X.4와 X.9 변수는 0값과 거의 비슷하게 나온 것을 확인할 수 있다.
+
+<br />
+
+b) regression coefficient 값을 실제 값과 비교해보자. 그리고 결과를 바탕으로 Lasso regression의 효과에 대해서 설명해보자.
+
+<br />
+
+좋은 회귀 모형이란 가장 적은 수의 독립변수로 종속 변수의 분산을 가장 많이 설명할 수 있는 모형이다. 
+
+하지만 너무 적은 변수를 사용하게 되면 bias가 높게 되고 (underfitting),
+너무 많은 변수를 사용하게 되면 모델의 복잡도는 올라가고 variance가 높아지게 된다 (overfitting)
+
+여기서 over fitting(high variance)을 해결하기 위해서 regression coefficient를 제약하거나 0에 가깝도록 하는 정규화방법이 있는데 2번에서는 그 중 Lasso regression을 사용했다. 
+
+위 log(λ)에 따른 mean-squared error 그래프를 살펴보면
+이때 model에 속하는 feature수는 3~4개 정도로 줄어든다.
+
+(Intercept)  0.5213757265 <br />
+X            1.2302749577 <br />
+X.2         -2.1493896170 <br />
+X.3          4.2021444499 <br />
+X.4         -0.2001799717 <br />
+X.5          .            <br />
+X.6          .            <br />
+X.7          .            <br />
+X.8          .            <br />
+X.9          0.0002457304 <br />
+X.10         .            <br />
+
+<br />
+
+그리고 위 예측값을 확인해보면 X.9는 0으로 생각해도 큰 영향을 미치지 않을것이다.
+그러면 남겨진 변수 X, X.1, X.2, X.3, X.4 4개가 위 그래프에서 제시한 4개의 feature 라고 생각할 수 있다. (3개로 줄인다면 그 다음으로 0에 가까운 X.4를 0으로 생각하자)
+
+<br />
+
+Lasso regression은 주로 많은 변수를 다룰 때 사용하는데 여기서 람다는 데이터로부터 cross - validation을 통해 영향력이 작은 베타를 회귀식에서 0으로 만들어 제거하면서 최대한 적은 수의 변수를 남긴다. 이렇게 구해진 모델은 훨씬 간결하고 해석에도 용이하다. 하지만 영향을 미치는 중요한 변수를 0으로 만들 경우, 정확도가 떨어질 수도 있다.
